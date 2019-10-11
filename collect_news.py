@@ -142,17 +142,86 @@ def search_naver_news(query, s_date, e_date):
 
         page += 10  
         
-        df = df.drop_duplicates(subset='url')  # 중복 기사 제거
+    df = df.drop_duplicates(subset='url')  # 중복 기사 제거
         
     return df
 
 
+def get_naver_comment(url_i):
+    comment_df = pd.DataFrame(columns = ['pdate', 'articleTitle', 'article', 'pcompany', 'url','comment', 'sympathyCount', 'antipathyCount'])
 
-
-
+    oid=url_i.split("oid=")[1].split("&")[0]
+    aid=url_i.split("aid=")[1]
+    page=1    
+    header = {
+        "User-agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36",
+        "referer":url_i,
+    } 
     
     
- 
+    
+    while True :
+        c_url="https://apis.naver.com/commentBox/cbox/web_neo_list_jsonp.json?ticket=news&templateId=default_society&pool=cbox5&_callback=jQuery1707138182064460843_1523512042464&lang=ko&country=&objectId=news"+oid+"%2C"+aid+"&categoryId=&pageSize=20&indexSize=10&groupId=&listType=OBJECT&pageType=more&page="+str(page)+"&refresh=false&sort=FAVORITE" 
+    # 파싱하는 단계입니다.
+        r=requests.get(c_url,headers=header)
+        cont=BeautifulSoup(r.content,"html.parser")    
+        total_comm=str(cont).split('comment":')[1].split(",")[0]
+
+        match=re.findall('"contents":([^\*]*),"userIdNo"', str(cont))
+        sympathyall = re.findall('"sympathyCount":([^\*]*),"antipathyCount"', str(cont))
+        antipathyall = re.findall('"antipathyCount":([^\*]*),"userBlind"', str(cont))
+        
+    #df에 댓글과 뉴스 저장
+        for j in range(len(match)):
+            print(news_df.get_value(i, columns[0]), news_df.get_value(i, columns[1]), match[j])
+            comment_df = comment_df.append(pd.DataFrame([[news_df.get_value(i, columns[0]), news_df.get_value(i, columns[1]), 
+                                                          news_df.get_value(i, columns[2]), news_df.get_value(i, columns[3]), 
+                                                          news_df.get_value(i, columns[4]), match[j], sympathyall[j],  antipathyall[j]]],
+                                                         columns=columns), ignore_index=True)
+    # 한번에 댓글이 20개씩 보이기 때문에 한 페이지씩 몽땅 댓글을 긁어 옵니다.
+        if int(total_comm) <= ((page) * 20):
+            break
+        else : 
+            page+=1
+            
+    df = df.drop_duplicates(subset='url')  # 중복 기사 제거
+
+
+
+    return df
+
+def get_rank_new(date):
+    date = date.replace(".","")
+    
+    rank_type = ['ranking_100', 'ranking_101', 'ranking_102', 'ranking_103', 'ranking_104', 'ranking_105']
+    rank_news_title = [0] * len(rank_type)
+    default_url = 'https://news.naver.com'
+    columns =  ['blind', 'href', 'title']
+    ranknews_df = pd.DataFrame(columns=columns)
+
+    day_url = 'https://news.naver.com/main/ranking/popularDay.nhn?rankingType=popular_day&date='+date
+    memo_url = 'https://news.naver.com/main/ranking/popularMemo.nhn?rankingType=popular_memo&date='+date
+    url = [day_url, memo_url]
+    for turl in url:
+        r=requests.get(memo_url)
+        cont=BeautifulSoup(r.content,"html.parser")    
+
+        
+
+        for i in range(len(rank_type)):
+            rank_news_title[i] = cont.find('div', id=rank_type[i])
+            ranking = BeautifulSoup(str(rank_news_title[i]),"html.parser")
+            blind = ranking.find('h5').text
+           
+            for i in range(5):
+                href = default_url+ranking.find_all("a")[i]['href']
+                title = ranking.find_all("a")[i]['title']
+                
+                ranknews_df = ranknews_df.append(pd.DataFrame([[blind, href,  title]],
+                                                                 columns=columns), ignore_index=True)
+    
+    return ranknews_df
+    
 def get_daum_comment(turl):
 
     req = requests.get(turl)
