@@ -59,77 +59,63 @@ def clean_text(text):
     return text
    
 def get_news(n_url):
-    news_detail = []
     print('news_url : ', n_url)
     breq = requests.get(n_url)
     bsoup = BeautifulSoup(breq.content, 'html.parser')
     
     # 날짜 파싱
     pdate = bsoup.select('.t11')[0].get_text()[:11]
-    news_detail.append(pdate)
-
     # 기사 제목
     title = bsoup.select('h3#articleTitle')[0].text
-    news_detail.append(title)
-
-    
-    # 기사 본문 크롤링 
+    # 기사 본문 크롤링
     _text = bsoup.select('#articleBodyContents')[0].get_text().replace('\n', " ")
     btext = _text.replace("// flash 오류를 우회하기 위한 함수 추가 function _flash_removeCallback() {}", "")
-    news_detail.append(btext.strip())
-
+    btext = btext.strip()
     # 신문사 크롤링
     try:
         pcompany = bsoup.select('#footer address')[0].a.get_text()
     except:
         pcompany = ''
-    news_detail.append(pcompany)
-    
     #url
-    news_detail.append(n_url)
+    #분류명
+    aclass = bsoup.find_all('em', {'class':'guide_categorization_item'})[0].get_text()
     
     #'pdate', 'articleTitle', 'article', 'pcompany', 'url'
-    return news_detail[0], news_detail[1], news_detail[2], news_detail[3], news_detail[4]
+    return pdate, title, btext, pcompany, n_url, aclass
     
 def get_news_df(n_url):
-    news_detail = []
     print('news_url : ', n_url)
     breq = requests.get(n_url)
     bsoup = BeautifulSoup(breq.content, 'html.parser')
     
     # 날짜 파싱
     pdate = bsoup.select('.t11')[0].get_text()[:11]
-    news_detail.append(pdate)
 
     # 기사 제목
     title = bsoup.select('h3#articleTitle')[0].text
-    news_detail.append(title)
-
     
     # 기사 본문 크롤링 
     _text = bsoup.select('#articleBodyContents')[0].get_text().replace('\n', " ")
     btext = _text.replace("// flash 오류를 우회하기 위한 함수 추가 function _flash_removeCallback() {}", "")
-    news_detail.append(btext.strip())
-
+    btext = btext.strip()
     # 신문사 크롤링
     try:
         pcompany = bsoup.select('#footer address')[0].a.get_text()
     except:
         pcompany = ''
-    news_detail.append(pcompany)
     
     #url
-    news_detail.append(n_url)
+    aclass = bsoup.find_all('em', {'class':'guide_categorization_item'})[0].get_text()
     
-    return pd.DataFrame([[news_detail[0], news_detail[1], news_detail[2], news_detail[3], news_detail[4]]],
-                        columns=['pdate', 'articleTitle', 'article', 'pcompany', 'url'])
+    return pd.DataFrame([[pdate, title, btext, pcompany, n_url, aclass]],
+                        columns=['pdate', 'articleTitle', 'article', 'pcompany', 'url', 'aclass'])
                         
 def search_naver_news(query, s_date, e_date):
 
     s_from = s_date.replace(".","")
     e_to = e_date.replace(".","")
     page = 1
-    df = pd.DataFrame(columns = ['pdate', 'articleTitle', 'article', 'pcompany', 'url'])
+    df = pd.DataFrame(columns = ['pdate', 'articleTitle', 'article', 'pcompany', 'url', 'aclass'])
 
 
     while True:
@@ -141,7 +127,7 @@ def search_naver_news(query, s_date, e_date):
         header = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36',
         }
-        req = requests.get(url,headers=header)
+        req = requests.get(url)#,headers=header)
         print(url)
         cont = req.content
         soup = BeautifulSoup(cont, 'html.parser')
@@ -154,7 +140,7 @@ def search_naver_news(query, s_date, e_date):
         with Pool(10) as p:
             get_news_list = p.map(get_news_df, news_list)
 
-        df = df.append(pd.concat(get_news_list))
+        df = df.append(pd.concat(get_news_list),ignore_index=True)
         
     #     for urls in soup.select("._sp_each_url"):
     #         try :
@@ -181,7 +167,7 @@ def search_naver_news(query, s_date, e_date):
 
 
 def get_naver_comment(url_i):
-    columns = ['pdate', 'articleTitle', 'article', 'pcompany', 'url','comment', 'sympathyCount', 'antipathyCount']
+    columns = ['pdate', 'articleTitle', 'article', 'pcompany', 'url', 'aclass' ,'comment', 'sympathyCount', 'antipathyCount']
 
     comment_df = pd.DataFrame(columns = columns)
 
@@ -193,7 +179,7 @@ def get_naver_comment(url_i):
         "referer":url_i,
     } 
     
-    pdate, articleTitle, article, pcompany, url = get_news(url_i)
+    pdate, articleTitle, article, pcompany, url, aclass = get_news(url_i)
     
     
     while True :
@@ -209,7 +195,7 @@ def get_naver_comment(url_i):
         
     #df에 댓글과 뉴스 저장
         for j in range(len(match)):
-            comment_df = comment_df.append(pd.DataFrame([[pdate, articleTitle, article, pcompany, url, match[j], sympathyall[j],  antipathyall[j]]],
+            comment_df = comment_df.append(pd.DataFrame([[pdate, articleTitle, article, pcompany, url, aclass, match[j], sympathyall[j],  antipathyall[j]]],
                                                          columns=columns), ignore_index=True)
     # 한번에 댓글이 20개씩 보이기 때문에 한 페이지씩 몽땅 댓글을 긁어 옵니다.
         if int(total_comm) <= ((page) * 20):
@@ -222,11 +208,11 @@ def get_naver_comment(url_i):
     return comment_df
     
 def get_naver_comment_list(url_l):
-    columns = ['pdate', 'articleTitle', 'article', 'pcompany', 'url','comment', 'sympathyCount', 'antipathyCount']
+    columns = ['pdate', 'articleTitle', 'article', 'pcompany', 'url', 'aclass', 'comment', 'sympathyCount', 'antipathyCount']
     df = pd.DataFrame(columns = columns)
     with Pool(10) as p:
         get_news_list = p.map(get_naver_comment, url_l)
-    df = df.append(pd.concat(get_news_list))
+    df = df.append(pd.concat(get_news_list),ignore_index=True)
         
     return df
     
@@ -273,12 +259,22 @@ def get_week_rank(cdate = date.today()):
     with Pool(7) as p:
         get_news_list = p.map(get_rank_new, day_list)
 
-    df = df.append(pd.concat(get_news_list))
+    df = df.append(pd.concat(get_news_list), ignore_index=True)
 
     return df
     
-    
-    
+def get_week_rank_all(cdate = date.today()):
+    df = get_week_rank(cdate)
+    df2 = pd.DataFrame(columns = ['pdate', 'articleTitle', 'article', 'pcompany', 'url', 'aclass'])
+
+    with Pool(10) as p:
+        get_week_news_list = p.map(get_news_df, list(df['href']))
+    df2 = df2.append(pd.concat(get_week_news_list),ignore_index=True)
+
+    return df2
+
+
+
     
     
 
