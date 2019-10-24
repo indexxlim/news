@@ -8,7 +8,4 @@ for Naver, Daum News
 
 현재 각각 모듈이 따로있는데 
 
-차후 Input, Output 정리해서 
-
-워드클라우드와 
-
+차후 Input, Output 정리 
