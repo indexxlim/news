@@ -220,13 +220,6 @@ def graph2json(articles, min_count=50, modularity=0.05, sort_by = 'closeness', t
     tmp_max = np.percentile(weights, 75)
     weights_normalized = (weights - np.min(weights)) / (tmp_max - np.min(weights) + 1e-9) + 0.2  # 0.2:보정값
 
-    # 검색 기록에 따라 연관 단어 index 변화
-    # ex) 첫 검색 : 남양유업 => 남양유업을 제외하고 1번 index부터 연관 검색어 지정
-    # ex) 두번째 검색 : 소비자 => 남양유업, 소비자를 제외하고 2번 index부터 연관 검색어 지정
-    # ex) 수정-> 무조건 키워드만 제거(한개씩)
-
-
-
     state = {}
 
     state['graph'] = G
